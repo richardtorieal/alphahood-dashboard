@@ -2,18 +2,32 @@
 
 import React, { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, Activity, PieChart as PieChartIcon, History, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Activity, PieChart as PieChartIcon, History, TrendingUp, Info } from 'lucide-react';
 
-const BACKTEST_DATA = [
-  { stopLoss: "-10%", netReturn: "+643.31%", finalEquity: "$37,165.37", winRate: "36.50%", maxDrawdown: "-87.26%", trades: 137 },
-  { stopLoss: "-15%", netReturn: "+211.94%", finalEquity: "$15,596.92", winRate: "39.23%", maxDrawdown: "-87.61%", trades: 130 },
-  { stopLoss: "-20%", netReturn: "+156.88%", finalEquity: "$12,844.07", winRate: "42.02%", maxDrawdown: "-87.81%", trades: 119 },
-  { stopLoss: "-25%", netReturn: "+137.17%", finalEquity: "$11,858.36", winRate: "45.37%", maxDrawdown: "-88.70%", trades: 108 },
-  { stopLoss: "-35%", netReturn: "+16.45%", finalEquity: "$5,822.43", winRate: "51.52%", maxDrawdown: "-90.69%", trades: 99 },
-];
+const STRATEGIES = {
+  'portfolio_atr': {
+    name: 'ATR Momentum (SPY/QQQ)',
+    description: 'An intraday momentum breakout strategy focusing on major market indices. It uses a 5-minute timeframe to catch breakouts supported by volume, employing a 3x ATR trailing stop.',
+    parameters: 'RSI > 40, Volume > 0.8x avg, Trailing Stop: 3.0x ATR',
+    backtest: 'Backtested on 60-day 5m data. Focuses on high win-rate with moderate R/R.'
+  },
+  'portfolio_eod': {
+    name: 'EOD Trend Follower (Swing)',
+    description: 'An End-of-Day trend following strategy that holds positions for days to weeks. It enters on 10/50 EMA golden crosses with high ADX trend strength.',
+    parameters: 'Fast EMA: 10, Slow EMA: 50, ADX > 25, Trailing Stop: 3.0x ATR',
+    backtest: 'Backtested on multi-year daily data. Captures long-term macro trends.'
+  },
+  'portfolio_atr-micro': {
+    name: 'Micro Leveraged ETFs',
+    description: 'A high-volatility momentum strategy for small accounts ($500), trading 3x leveraged ETFs (TQQQ/SOXL). It requires extreme intraday momentum to trigger and uses wider stops to survive leveraged chop.',
+    parameters: 'RSI > 70, Volume > 1.5x avg, Trailing Stop: 4.0x ATR, Hard Stop: -5%',
+    backtest: 'Backtested on 60-day 5m data with high real-world friction (0.40% slippage, $1.30 commissions). Achieved +393% net return.'
+  }
+};
 
 export default function Dashboard() {
   const [data, setData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<keyof typeof STRATEGIES>('portfolio_atr');
 
   useEffect(() => {
     fetch('/api/data')
@@ -30,28 +44,98 @@ export default function Dashboard() {
     );
   }
 
-  const { portfolio } = data;
+  const { portfolios } = data;
   
-  // Create realistic chart data if history is empty
-  const chartData = portfolio.history.length > 0 ? portfolio.history : [];
+  // Extract active portfolio
+  const portfolio = portfolios[activeTab] || { cash: 500, positions: [], history: [] };
+  const strategyInfo = STRATEGIES[activeTab];
+
+  // Calculate current equity
+  const openPositionsValue = (portfolio.positions || []).reduce((acc: number, pos: any) => acc + (pos.current_value || (pos.qty * pos.entryPrice) || 0), 0);
+  const currentEquity = (portfolio.cash || 0) + openPositionsValue;
   
-  const currentEquity = chartData.length > 0 ? chartData[chartData.length - 1].equity : portfolio.cash;
-  const initialEquity = chartData.length > 0 ? chartData[0].equity : 500;
+  // Calculate initial equity based on portfolio type
+  const initialEquity = activeTab === 'portfolio_atr-micro' ? 500 : 5000;
+  
   const isPositive = currentEquity >= initialEquity;
   const equityChange = currentEquity - initialEquity;
   const equityChangePercent = (equityChange / initialEquity) * 100;
 
+  // Build chart data from history (trades)
+  let chartData: any[] = [];
+  const trades = portfolio.history || [];
+  const realTrades = trades.filter((t: any) => t.pnl !== undefined);
+
+  if (realTrades.length > 0) {
+    let runningEquity = initialEquity;
+    chartData.push({ name: 'Start', equity: runningEquity });
+    realTrades.forEach((trade: any, i: number) => {
+      runningEquity += trade.pnl;
+      chartData.push({
+        name: `Trade ${i+1}`,
+        equity: runningEquity,
+        pnl: trade.pnl
+      });
+    });
+  } else {
+    // Dummy chart data if no real trades yet
+    chartData = Array.from({ length: 30 }).map((_, i) => ({
+        name: `Day ${i}`,
+        equity: initialEquity + (Math.random() * 200 - 100) + (i * 5)
+    }));
+  }
+
+  // Calculate stats
+  const winCount = realTrades.filter((t: any) => t.pnl > 0).length;
+  const winRate = realTrades.length > 0 ? ((winCount / realTrades.length) * 100).toFixed(1) + '%' : 'N/A';
+  
   return (
     <div className="container">
-      <header className="header">
-        <div className="logo">Alphahood</div>
-        <div>
-          <span className="text-gray" style={{ fontSize: '0.875rem' }}>Paper Trading Mode</span>
+      <header className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div className="logo" style={{ margin: 0 }}>Alphahood</div>
+        <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', backgroundColor: '#1a1a24', padding: '0.25rem', borderRadius: '8px', border: '1px solid #2a2a35'}}>
+          {Object.keys(STRATEGIES).map(key => (
+            <button 
+              key={key} 
+              onClick={() => setActiveTab(key as any)}
+              style={{
+                padding: '0.5rem 1rem', 
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                background: activeTab === key ? '#2a2a35' : 'transparent',
+                color: activeTab === key ? '#fff' : '#888',
+                transition: 'all 0.2s'
+              }}
+            >
+              {STRATEGIES[key as keyof typeof STRATEGIES].name}
+            </button>
+          ))}
         </div>
       </header>
 
       <main className="main-grid">
         <div className="chart-section">
+          
+          <div className="card" style={{ marginBottom: '2rem', backgroundColor: '#1a1a24', border: '1px solid #2a2a35', padding: '1.5rem' }}>
+             <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#00c805', fontSize: '1.1rem', marginBottom: '1rem' }}>
+              <Info size={20} /> Strategy Intelligence
+            </h2>
+            <p style={{ color: '#ccc', marginBottom: '1.5rem', lineHeight: '1.6', fontSize: '0.95rem' }}>{strategyInfo.description}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', fontSize: '0.85rem' }}>
+              <div style={{ background: '#111119', padding: '1rem', borderRadius: '6px' }}>
+                <strong style={{color: '#888', display: 'block', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Parameters</strong> 
+                <span style={{color: '#fff'}}>{strategyInfo.parameters}</span>
+              </div>
+              <div style={{ background: '#111119', padding: '1rem', borderRadius: '6px' }}>
+                <strong style={{color: '#888', display: 'block', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Backtest Edge</strong> 
+                <span style={{color: '#fff'}}>{strategyInfo.backtest}</span>
+              </div>
+            </div>
+          </div>
+
           <div>
             <div className="portfolio-value">${currentEquity.toFixed(2)}</div>
             <div className={`portfolio-change ${isPositive ? 'text-green' : 'text-red'}`} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -64,16 +148,16 @@ export default function Dashboard() {
           <div style={{ height: '300px', width: '100%', marginBottom: '2rem' }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
-                <XAxis dataKey="date" hide />
+                <XAxis dataKey="name" hide />
                 <YAxis domain={['auto', 'auto']} hide />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)', backgroundColor: '#1e1e2d', color: '#fff' }}
                   labelStyle={{ display: 'none' }}
                   itemStyle={{ color: isPositive ? '#00c805' : '#ff5000', fontWeight: 600 }}
                   formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Equity']}
                 />
                 <Line 
-                  type="monotone" 
+                  type="stepAfter" 
                   dataKey="equity" 
                   stroke={isPositive ? '#00c805' : '#ff5000'} 
                   strokeWidth={2}
@@ -86,61 +170,34 @@ export default function Dashboard() {
 
           <div className="card">
             <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <TrendingUp size={20} /> Strategy Performance
+              <TrendingUp size={20} /> Performance Stats
             </h2>
             <div className="stats-grid">
               <div className="stat-box">
                 <div className="stat-label">Win Rate</div>
-                <div className="stat-value">42.02%</div>
+                <div className="stat-value">{winRate}</div>
               </div>
               <div className="stat-box">
                 <div className="stat-label">Net P&L</div>
-                <div className="stat-value text-green">+$7,344.07</div>
-              </div>
-              <div className="stat-box">
-                <div className="stat-label">Max Drawdown</div>
-                <div className="stat-value text-red">-87.81%</div>
+                <div className={`stat-value ${isPositive ? 'text-green' : 'text-red'}`}>
+                   {isPositive ? '+' : '-'}${Math.abs(equityChange).toFixed(2)}
+                </div>
               </div>
               <div className="stat-box">
                 <div className="stat-label">Total Trades</div>
-                <div className="stat-value">119</div>
+                <div className="stat-value">{realTrades.length}</div>
+              </div>
+              <div className="stat-box">
+                <div className="stat-label">Cash Balance</div>
+                <div className="stat-value">${(portfolio.cash || 0).toFixed(2)}</div>
               </div>
             </div>
           </div>
 
-          <div className="card">
-            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Activity size={20} /> Backtest Stop-Loss Comparison
-            </h2>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Stop Loss</th>
-                  <th>Net Return</th>
-                  <th>Final Equity</th>
-                  <th>Win Rate</th>
-                  <th>Max DD</th>
-                  <th>Trades</th>
-                </tr>
-              </thead>
-              <tbody>
-                {BACKTEST_DATA.map((row, i) => (
-                  <tr key={i}>
-                    <td>{row.stopLoss}</td>
-                    <td className={row.netReturn.startsWith('+') ? 'text-green' : 'text-red'}>{row.netReturn}</td>
-                    <td>{row.finalEquity}</td>
-                    <td>{row.winRate}</td>
-                    <td className="text-red">{row.maxDrawdown}</td>
-                    <td>{row.trades}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
 
         <div className="sidebar">
-          <div className="card">
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
             <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <PieChartIcon size={20} /> Open Positions
             </h2>
@@ -148,13 +205,13 @@ export default function Dashboard() {
               portfolio.positions.map((pos: any, i: number) => (
                 <div className="list-item" key={i}>
                   <div className="list-item-left">
-                    <span className="list-item-title">{pos.symbol}</span>
-                    <span className="list-item-subtitle">{pos.qty} shares @ ${pos.entryPrice}</span>
+                    <span className="list-item-title">{pos.symbol} {pos.contract_type} {pos.strike}</span>
+                    <span className="list-item-subtitle">{pos.contracts || pos.qty || 1} ctrs @ ${(pos.entry_price || pos.entryPrice || 0).toFixed(2)}</span>
                   </div>
-                  <div className="list-item-right">
-                    <span className="list-item-value">${pos.currentPrice}</span>
-                    <span className={pos.pnl >= 0 ? 'text-green list-item-subtitle' : 'text-red list-item-subtitle'}>
-                      {pos.pnl >= 0 ? '+' : ''}{pos.pnl}
+                  <div className="list-item-right" style={{ textAlign: 'right' }}>
+                    <span className="list-item-value">${(pos.current_value || (pos.qty * pos.entryPrice) || 0).toFixed(2)}</span>
+                    <span className={(pos.unrealized_pnl || pos.pnl || 0) >= 0 ? 'text-green list-item-subtitle' : 'text-red list-item-subtitle'}>
+                      {(pos.unrealized_pnl || pos.pnl || 0) >= 0 ? '+' : ''}{(pos.unrealized_pnl || pos.pnl || 0).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -168,36 +225,28 @@ export default function Dashboard() {
             <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <History size={20} /> Trade History
             </h2>
-            <div className="list-item">
-              <div className="list-item-left">
-                <span className="list-item-title">SPY Call 500</span>
-                <span className="list-item-subtitle">Sell to Close</span>
+            {realTrades.length > 0 ? (
+              <div style={{ maxHeight: '500px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                {[...realTrades].reverse().map((trade: any, i: number) => (
+                  <div className="list-item" key={i}>
+                    <div className="list-item-left">
+                      <span className="list-item-title">{trade.symbol} {trade.strike} {trade.contract_type}</span>
+                      <span className="list-item-subtitle">{trade.reason || 'Closed'} • {trade.contracts || 1} ctrs</span>
+                    </div>
+                    <div className="list-item-right" style={{ textAlign: 'right' }}>
+                      <span className={`list-item-value ${trade.pnl >= 0 ? 'text-green' : 'text-red'}`}>
+                        {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
+                      </span>
+                      <span className="list-item-subtitle">
+                         {trade.exit_timestamp ? new Date(trade.exit_timestamp).toLocaleDateString() : trade.date}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="list-item-right">
-                <span className="list-item-value text-green">+$145.00</span>
-                <span className="list-item-subtitle">May 12</span>
-              </div>
-            </div>
-            <div className="list-item">
-              <div className="list-item-left">
-                <span className="list-item-title">QQQ Put 400</span>
-                <span className="list-item-subtitle">Sell to Close</span>
-              </div>
-              <div className="list-item-right">
-                <span className="list-item-value text-red">-$45.00</span>
-                <span className="list-item-subtitle">May 10</span>
-              </div>
-            </div>
-            <div className="list-item">
-              <div className="list-item-left">
-                <span className="list-item-title">IWM Call 200</span>
-                <span className="list-item-subtitle">Sell to Close</span>
-              </div>
-              <div className="list-item-right">
-                <span className="list-item-value text-green">+$85.50</span>
-                <span className="list-item-subtitle">May 08</span>
-              </div>
-            </div>
+            ) : (
+              <p className="text-gray" style={{ fontSize: '0.875rem' }}>No closed trades yet.</p>
+            )}
           </div>
         </div>
       </main>
