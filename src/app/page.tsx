@@ -70,7 +70,7 @@ export default function Dashboard() {
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                   labelStyle={{ display: 'none' }}
                   itemStyle={{ color: isPositive ? '#00c805' : '#ff5000', fontWeight: 600 }}
-                  formatter={(value: number) => [`$${value.toFixed(2)}`, 'Equity']}
+                  formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Equity']}
                 />
                 <Line 
                   type="monotone" 

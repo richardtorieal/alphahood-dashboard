@@ -7,7 +7,7 @@ export async function GET() {
     const portfolioPath = '/Users/richardanderson/projects/alphahood/data/paper_portfolio.json';
     const reportsDir = '/Users/richardanderson/projects/alphahood/data/paper_reports';
     
-    let portfolio = { cash: 500, positions: [], history: [] };
+    let portfolio: { cash: number, positions: any[], history: any[] } = { cash: 500, positions: [], history: [] };
     if (fs.existsSync(portfolioPath)) {
       portfolio = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
     }
