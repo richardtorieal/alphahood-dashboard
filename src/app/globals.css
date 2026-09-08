@@ -1,26 +1,209 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #000000;
+  --gray-100: #f5f8fa;
+  --gray-200: #e2e8f0;
+  --gray-500: #64748b;
+  --gray-900: #0f172a;
+  
+  --rh-green: #00c805;
+  --rh-green-hover: #00a804;
+  --rh-red: #ff5000;
+  --rh-red-hover: #e04600;
+
+  --border: #f1f5f9;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  background: var(--background);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Layout */
+.container {
+  max-width: 1024px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2rem;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+/* Typography */
+h1, h2, h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.text-green { color: var(--rh-green); }
+.text-red { color: var(--rh-red); }
+.text-gray { color: var(--gray-500); }
+
+/* Dashboard Sections */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+@media (min-width: 768px) {
+  .main-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.chart-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.portfolio-value {
+  font-size: 3rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.25rem;
+}
+
+.portfolio-change {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 2rem;
+}
+
+/* Cards */
+.card {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  color: var(--gray-900);
+}
+
+/* Tables / Lists */
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.list-item-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.list-item-title {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.list-item-subtitle {
+  font-size: 0.875rem;
+  color: var(--gray-500);
+  margin-top: 0.25rem;
+}
+
+.list-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.list-item-value {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-box {
+  background: var(--gray-100);
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--gray-500);
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* Responsive Table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th, .data-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.data-table td {
+  font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+  .data-table {
+    display: block;
+    overflow-x: auto;
+  }
 }
